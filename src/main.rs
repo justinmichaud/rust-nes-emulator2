@@ -6,14 +6,14 @@ extern crate piston;
 extern crate opengl_graphics;
 extern crate image;
 extern crate graphics;
-extern crate glutin_window;
+extern crate piston_window;
 
 use piston::input::*;
 use std::time::Instant;
 use piston::window::WindowSettings;
-use opengl_graphics::{GlGraphics, OpenGL, Texture, TextureSettings};
+use opengl_graphics::OpenGL;
 use piston::event_loop::*;
-use glutin_window::GlutinWindow as Window;
+use piston_window::*;
 
 mod cpu;
 mod ines;
@@ -84,27 +84,25 @@ struct App {
     frames: u64,
     last_time: Instant,
 
-    gl_graphics: GlGraphics,
     controller_method: Box<ControllerMethod>,
-    texture: Texture,
+    texture: G2dTexture,
     canvas: NesImageBuffer,
 }
 
 fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box<ControllerMethod>) {
     println!("Loaded rom with {:?}", flags);
 
-    let size = [256, 240];
+    let size = [256*3, 240*3];
 
-    let mut window: Window =
+    let mut window: PistonWindow =
         WindowSettings::new("Emulator", size)
-            .opengl(OpenGL::V2_1)
+            .opengl(OpenGL::V3_2)
             .exit_on_esc(true).build().unwrap();
-    let gl_graphics = GlGraphics::new(OpenGL::V2_1);
 
     let nes = Nes::new(prg, chr, flags.mapper, flags.prg_ram_size, flags.horiz_mirroring);
 
     let canvas = make_canvas(size[0], size[1]);
-    let tex = Texture::from_image(&canvas, &TextureSettings::new());
+    let tex = Texture::from_image(&mut window.factory,&canvas, &TextureSettings::new()).unwrap();
 
     let mut app = App {
         nes: nes,
@@ -112,25 +110,23 @@ fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box
         last_time:Instant::now(),
         controller_method: controller_method,
 
-        gl_graphics: gl_graphics,
         texture: tex,
         canvas: canvas,
     };
 
-
     let mut events = Events::new(EventSettings::new());
     while let Some(e) = events.next(&mut window) {
-        handle_event(e, &mut app);
+        handle_event(&mut window, e, &mut app);
     }
 }
 
-fn handle_event(e: Event, app: &mut App) {
+fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
     if let Some(size) = e.resize_args() {
         app.canvas = make_canvas(size[0] as u32, size[1] as u32);
-        app.texture = Texture::from_image(&app.canvas, &TextureSettings::new());
+        app.texture = Texture::from_image(&mut window.factory,&app.canvas, &TextureSettings::new()).unwrap();
     }
 
-    if let Some(args) = e.render_args() {
+    if let Some(_args) = e.render_args() {
         app.frames += 1;
 
         if app.frames > 60 {
@@ -144,11 +140,12 @@ fn handle_event(e: Event, app: &mut App) {
         app.nes.tick();
         app.nes.prepare_draw(&mut app.canvas);
 
-        app.texture.update(&app.canvas);
+        app.texture.update(&mut window.encoder,&app.canvas).unwrap();
         let tex = &app.texture;
 
-        app.gl_graphics.draw(args.viewport(),
-                              |ctx, g2d| graphics::image(tex, ctx.transform, g2d));
+        window.draw_2d(&e, |ctx, g2d| {
+            graphics::image(tex, ctx.zoom(1.0/2.0).transform, g2d)
+        });
 
         //app.canvas.save(format!("{}.png", app.frames)).unwrap();
     }
