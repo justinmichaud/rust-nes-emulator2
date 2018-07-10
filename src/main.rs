@@ -22,11 +22,8 @@ mod controller;
 mod nes;
 mod memory;
 mod ppu;
-mod smb_hack;
-mod smb_level;
 mod settings;
 mod event_loop;
-mod level_consts;
 
 mod mapper_0;
 mod mapper_4;
@@ -53,11 +50,6 @@ impl ControllerMethod for User {
                     if DEBUG {
                         write_bytes_to_file(format!("{}.bin", self.dump_count), &nes.chipset.mem.ram);
                         self.dump_count += 1;
-                    }
-                },
-                Button::Keyboard(Key::K) => {
-                    if SPECIAL && USE_HACKS {
-                        smb_hack::kill_yourself(nes);
                     }
                 },
                 Button::Keyboard(Key::Up) => nes.chipset.controller1.up = true,
@@ -87,47 +79,6 @@ impl ControllerMethod for User {
                 _ => ()
             }
         }
-
-        if SPECIAL {
-            if nes.chipset.controller1.start {
-                nes.chipset.controller1.right = false;
-                nes.chipset.controller1.b = false;
-            } else {
-                nes.chipset.controller1.right = true;
-                nes.chipset.controller1.b = true;
-            }
-            nes.chipset.controller1.left = false;
-            nes.chipset.controller1.up = false;
-            nes.chipset.controller1.down = false;
-        }
-    }
-}
-
-struct Movie {
-    input: Box<Vec<String>>
-}
-
-impl ControllerMethod for Movie {
-    fn do_input(&mut self, nes: &mut Nes, _: &Input) {
-        if self.input.is_empty() {
-            return;
-        }
-
-        let line = self.input.remove(0);
-        let mut parts = line.split('|');
-        let mut p1 = match parts.nth(2) {
-            Some(s) => s,
-            _ => return
-        }.chars();
-
-        nes.chipset.controller1.right = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.left = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.down = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.up = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.start = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.select = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.b = ![' ', '.'].contains(&p1.next().unwrap());
-        nes.chipset.controller1.a = ![' ', '.'].contains(&p1.next().unwrap());
     }
 }
 
@@ -145,11 +96,7 @@ struct App {
 fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box<ControllerMethod>) {
     println!("Loaded rom with {:?}", flags);
 
-    let size = if SPECIAL {
-        [405, 720]
-    } else {
-        [256*3, 240*3]
-    };
+    let size = [256*3, 240*3];
 
     let window: Sdl2Window =
         WindowSettings::new("Emulator", size)
@@ -195,13 +142,7 @@ fn handle_event(window: &mut Sdl2Window, e: Input, app: &mut App) {
             app.last_time = Instant::now();
         }
 
-        let speedup = if USE_MOVIE { 20 } else { 1 };
-        for _ in 0..speedup {
-            if USE_MOVIE {
-                app.controller_method.as_mut().do_input(&mut app.nes, &e);
-            }
-            app.nes.tick();
-        }
+        app.nes.tick();
         app.nes.prepare_draw(&mut app.canvas);
 
         app.texture.update(&app.canvas);
@@ -213,20 +154,11 @@ fn handle_event(window: &mut Sdl2Window, e: Input, app: &mut App) {
         //app.canvas.save(format!("{}.png", app.frames)).unwrap();
     }
 
-    if !USE_MOVIE {
-        app.controller_method.as_mut().do_input(&mut app.nes, &e);
-    }
+    app.controller_method.as_mut().do_input(&mut app.nes, &e);
 }
 
 fn main() {
-    let input: Box<ControllerMethod> = if !USE_MOVIE { Box::new(User { dump_count: 0 }) } else {
-//        let mut input_log = lines_from_file("tests/mars608,happylee-smb-warpless,walkathon.fm2");
-        let mut input_log = lines_from_file("tests/happylee-supermariobros,warped.fm2");
-        while !input_log.first().unwrap().starts_with('|') { input_log.remove(0); }
-        input_log.remove(0); //This makes it work for some reason
-        input_log.remove(0);
-        Box::new(Movie { input: Box::new(input_log) })
-    };
+    let input: Box<ControllerMethod> = Box::new(User { dump_count: 0 });
     match load_file("assets/smb.nes") {
         Ok(rom) => emulate(rom, input),
         Err(e) => panic!("Error: {:?}", e)

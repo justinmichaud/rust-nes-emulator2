@@ -6,13 +6,10 @@ use ppu::*;
 use std::io;
 use mapper_0::*;
 use mapper_4::*;
-use smb_hack::SmbHack;
-use smb_hack;
 
 pub struct Nes {
     pub cpu: Cpu,
     pub chipset: Chipset,
-    pub smb_hack: SmbHack,
 }
 
 pub struct Chipset {
@@ -54,7 +51,6 @@ impl Nes {
 
         let mut nes = Nes {
             cpu: Cpu::new(mem.read16(&mut mapper, 0xFFFC)),
-            smb_hack: SmbHack::new(),
             chipset: Chipset {
                 mapper: mapper,
                 mem: mem,
@@ -67,10 +63,6 @@ impl Nes {
                 ppu_writes_requested: vec![],
             },
         };
-
-        if USE_HACKS {
-            smb_hack::initial_state(&mut nes);
-        }
 
         nes
     }
@@ -92,9 +84,6 @@ impl Nes {
             }
 
             self.cpu.tick(&mut self.chipset);
-            if USE_HACKS {
-                smb_hack::tick(self);
-            }
             self.chipset.ppu.tick(&mut self.cpu, &mut self.chipset.mapper);
 
             if self.cpu.debug {
@@ -110,37 +99,13 @@ impl Nes {
     pub fn prepare_draw(&mut self, canvas: &mut NesImageBuffer) {
         self.chipset.ppu.prepare_draw(&mut self.chipset.mapper);
 
-        if !SPECIAL {
-            let w = self.chipset.ppu.output_canvas.width();
-            let h = self.chipset.ppu.output_canvas.height();
-            let cw = canvas.width();
-            let ch = canvas.height();
+        let w = self.chipset.ppu.output_canvas.width();
+        let h = self.chipset.ppu.output_canvas.height();
+        let cw = canvas.width();
+        let ch = canvas.height();
 
-            for (x,y,p) in canvas.enumerate_pixels_mut() {
-                *p = *self.chipset.ppu.output_canvas.get_pixel(x*w/cw, y*h/ch);
-            }
-            return;
-        }
-
-        for (x,y,p) in self.chipset.ppu.output_canvas.enumerate_pixels() {
-            let x = x as f64;
-            let y = y as f64;
-
-            let (mapped_left, _) = self.get_mapped(x-0.5, y, canvas.width(), canvas.height());
-            let (mapped_right, _) = self.get_mapped(x+0.5, y, canvas.width(), canvas.height());
-            let (_, mapped_top) = self.get_mapped(x, y+0.5, canvas.width(), canvas.height());
-            let (_, mapped_bottom) = self.get_mapped(x, y-0.5, canvas.width(), canvas.height());
-
-            for ix in mapped_left.round() as i32 ... mapped_right.round() as i32 {
-                for iy in mapped_bottom.round() as i32 ... mapped_top.round() as i32 {
-                    if ix < 0 || iy < 0 || ix >= canvas.width() as i32
-                        || iy >= canvas.height() as i32 {
-                        continue;
-                    }
-
-                    canvas.put_pixel(ix as u32, iy as u32, *p);
-                }
-            }
+        for (x,y,p) in canvas.enumerate_pixels_mut() {
+            *p = *self.chipset.ppu.output_canvas.get_pixel(x*w/cw, y*h/ch);
         }
     }
 
