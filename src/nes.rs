@@ -1,11 +1,9 @@
-use settings::*;
 use cpu::*;
 use memory::*;
 use controller::*;
 use ppu::*;
 use std::io;
 use mapper_0::*;
-use mapper_4::*;
 
 pub struct Nes {
     pub cpu: Cpu,
@@ -45,11 +43,10 @@ impl Nes {
         let mut mem = Memory::new();
         let mut mapper = match mapper {
             0 => Box::new(Mapper0::new(prg, prg_ram_size, chr)) as Box<Mapper>,
-            4 => Box::new(Mapper4::new(prg, prg_ram_size, chr)) as Box<Mapper>,
             _ => panic!()
         };
 
-        let mut nes = Nes {
+        Nes {
             cpu: Cpu::new(mem.read16(&mut mapper, 0xFFFC)),
             chipset: Chipset {
                 mapper: mapper,
@@ -62,9 +59,7 @@ impl Nes {
 
                 ppu_writes_requested: vec![],
             },
-        };
-
-        nes
+        }
     }
 
     pub fn tick(&mut self) {
@@ -108,44 +103,27 @@ impl Nes {
             *p = *self.chipset.ppu.output_canvas.get_pixel(x*w/cw, y*h/ch);
         }
     }
-
-    fn get_mapped(&self, x: f64, y: f64, out_width: u32, out_height: u32) -> (f64, f64) {
-        let w = self.chipset.ppu.output_canvas.width();
-        let hw = w as f64 / 2.;
-        let h = self.chipset.ppu.output_canvas.height();
-        let hh = h as f64 / 2.;
-
-        let x_off = x as f64 - hw;
-        let y_off = y as f64 - hh;
-        let r = 12000f64;
-        let z = r - (r.powi(2) - x_off.powi(2)).sqrt() + 1.;
-
-        let mapped_x = (x_off/z)*3. + (out_width as f64/2.);
-        let mapped_y = (y_off)*3. + (out_height as f64/2.);
-
-        (mapped_x, mapped_y)
-    }
 }
 
 impl Chipset {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr as usize {
-            0x2000 ... 0x2007 => self.ppu.read_main(&mut self.mapper, addr),
-            0x2008...0x3FFF => self.read(mirror_addr(0x2000...0x2007, 0x2008...0x3FFF, addr)),
+            0x2000 ..= 0x2007 => self.ppu.read_main(&mut self.mapper, addr),
+            0x2008..=0x3FFF => self.read(mirror_addr(0x2000..=0x2007, 0x2008..=0x3FFF, addr)),
             0x4014 => self.ppu.read_main(&mut self.mapper, addr),
             0x4016 => self.controller1.read(&mut self.mapper, addr),
             0x4017 => self.controller2.read(&mut self.mapper, addr),
-            0x4000 ... 0x4017 => 0 /* apu */,
+            0x4000 ..= 0x4017 => 0 /* apu */,
             _ => self.mem.read(&mut self.mapper, addr)
         }
     }
 
     pub fn write(&mut self, addr: u16, val: u8) {
         match addr as usize {
-            0x2000 ... 0x2007 => {
+            0x2000 ..= 0x2007 => {
                 self.ppu_writes_requested.push((addr, val));
             },
-            0x2008...0x3FFF => self.write(mirror_addr(0x2000...0x2007, 0x2008...0x3FFF, addr), val),
+            0x2008..=0x3FFF => self.write(mirror_addr(0x2000..=0x2007, 0x2008..=0x3FFF, addr), val),
             0x4014 => {
                 self.ppu_dma_requested = true;
                 self.ppu_dma_val = val;
@@ -154,7 +132,7 @@ impl Chipset {
                 self.controller1.write(&mut self.mapper, addr, val);
                 self.controller2.write(&mut self.mapper, addr, val);
             },
-            0x4000 ... 0x4017 => () /* apu */,
+            0x4000 ..= 0x4017 => () /* apu */,
             _ => self.mem.write(&mut self.mapper, addr, val)
         }
     }

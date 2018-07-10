@@ -1,20 +1,19 @@
-#![feature(inclusive_range_syntax)]
-#![feature(inclusive_range)]
 #![feature(plugin)]
 
 #![plugin(phf_macros)]
 extern crate phf;
-extern crate sdl2_window;
 extern crate piston;
 extern crate opengl_graphics;
 extern crate image;
 extern crate graphics;
+extern crate glutin_window;
 
-use sdl2_window::*;
 use piston::input::*;
 use std::time::Instant;
-use piston::window::{OpenGLWindow, WindowSettings};
+use piston::window::WindowSettings;
 use opengl_graphics::{GlGraphics, OpenGL, Texture, TextureSettings};
+use piston::event_loop::*;
+use glutin_window::GlutinWindow as Window;
 
 mod cpu;
 mod ines;
@@ -23,10 +22,8 @@ mod nes;
 mod memory;
 mod ppu;
 mod settings;
-mod event_loop;
 
 mod mapper_0;
-mod mapper_4;
 
 use ines::*;
 use nes::*;
@@ -34,7 +31,7 @@ use settings::*;
 use ppu::{make_canvas, NesImageBuffer};
 
 trait ControllerMethod {
-    fn do_input(&mut self, nes: &mut Nes, e: &Input);
+    fn do_input(&mut self, nes: &mut Nes, e: &Event);
 }
 
 struct User {
@@ -42,7 +39,7 @@ struct User {
 }
 
 impl ControllerMethod for User {
-    fn do_input(&mut self, nes: &mut Nes, e: &Input) {
+    fn do_input(&mut self, nes: &mut Nes, e: &Event) {
         if let Some(button) = e.press_args() {
             match button {
                 Button::Keyboard(Key::D) => nes.cpu.debug = DEBUG,
@@ -96,12 +93,11 @@ struct App {
 fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box<ControllerMethod>) {
     println!("Loaded rom with {:?}", flags);
 
-    let size = [256*3, 240*3];
+    let size = [256, 240];
 
-    let window: Sdl2Window =
+    let mut window: Window =
         WindowSettings::new("Emulator", size)
             .opengl(OpenGL::V2_1)
-            .srgb(false)
             .exit_on_esc(true).build().unwrap();
     let gl_graphics = GlGraphics::new(OpenGL::V2_1);
 
@@ -110,7 +106,7 @@ fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box
     let canvas = make_canvas(size[0], size[1]);
     let tex = Texture::from_image(&canvas, &TextureSettings::new());
 
-    let app = App {
+    let mut app = App {
         nes: nes,
         frames: 0,
         last_time:Instant::now(),
@@ -121,17 +117,20 @@ fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box
         canvas: canvas,
     };
 
-    event_loop::event_loop::run(window, handle_event, app);
+
+    let mut events = Events::new(EventSettings::new());
+    while let Some(e) = events.next(&mut window) {
+        handle_event(e, &mut app);
+    }
 }
 
-fn handle_event(window: &mut Sdl2Window, e: Input, app: &mut App) {
+fn handle_event(e: Event, app: &mut App) {
     if let Some(size) = e.resize_args() {
         app.canvas = make_canvas(size[0] as u32, size[1] as u32);
         app.texture = Texture::from_image(&app.canvas, &TextureSettings::new());
     }
 
     if let Some(args) = e.render_args() {
-        window.make_current();
         app.frames += 1;
 
         if app.frames > 60 {
