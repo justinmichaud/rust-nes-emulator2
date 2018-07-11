@@ -115,8 +115,7 @@ impl Chipset {
             0x2008..=0x3FFF => self.read(mirror_addr(0x2000..=0x2007, 0x2008..=0x3FFF, addr)),
             0x4014 => self.ppu.read_main(&mut self.mapper, addr),
             0x4016 => self.controller1.read(&mut self.mapper, addr),
-            0x4017 => self.controller2.read(&mut self.mapper, addr),
-            0x4000 ..= 0x4017 => 0 /* apu */,
+            0x4000 ..= 0x4017 => self.sound.read(&mut self.mapper, addr),
             _ => self.mem.read(&mut self.mapper, addr)
         }
     }
@@ -135,7 +134,7 @@ impl Chipset {
                 self.controller1.write(&mut self.mapper, addr, val);
                 self.controller2.write(&mut self.mapper, addr, val);
             },
-            0x4000 ..= 0x4017 => () /* apu */,
+            0x4000 ..= 0x4017 => self.sound.write(&mut self.mapper, addr, val),
             _ => self.mem.write(&mut self.mapper, addr, val)
         }
     }

@@ -1,6 +1,8 @@
 use sdl2::audio::*;
 use sdl2;
 use std::sync::mpsc::*;
+use memory::Mapper;
+use memory::Mem;
 
 struct SoundData {
     data: [Vec<u8>; 5],
@@ -17,7 +19,6 @@ impl AudioCallback for SoundData {
 
         if let Ok((i, d)) = self.recv.try_recv() {
             self.data[i] = d;
-            self.pos[i] = 0;
         }
 
         for dst in out.iter_mut() {
@@ -38,13 +39,15 @@ impl AudioCallback for SoundData {
 
 fn make_tone(hz: u32) -> Vec<u8> {
     let mut data = vec![];
-    for _ in 0..5 {
-        let max = (44100/hz/2) as u8;
-        for i in 0..max {
-            data.push(i * 2);
-        }
-        for i in 0..max {
-            data.push((max - i - 1) * 2);
+    if hz > 0 {
+        for _ in 0..1 {
+            let max = (44100/hz/2) as u8;
+            for i in 0..max {
+                data.push(i * 2);
+            }
+            for i in 0..max {
+                data.push((max - i - 1) * 2);
+            }
         }
     }
     data
@@ -56,9 +59,9 @@ pub fn init_audio() -> NesSound {
     let audio = sdl.audio().unwrap();
 
     let desired_spec = AudioSpecDesired {
-        freq: Some(44_100),
+        freq: Some(44100),
         channels: Some(1), // mono
-        samples: None      // default
+        samples: Some(128)
     };
 
     let (send, recv) = channel();
@@ -78,18 +81,46 @@ pub fn init_audio() -> NesSound {
     NesSound {
         _audio: audio,
         _device: device,
-        send
+        send,
+        timer: 0,
+        count: 0,
     }
 }
 
 pub struct NesSound {
     _audio: sdl2::AudioSubsystem,
     _device:  AudioDevice<SoundData>,
-    send: Sender<(usize, Vec<u8>)>
+    send: Sender<(usize, Vec<u8>)>,
+
+    pub timer: u16,
+    count: i8,
+
 }
 
 impl NesSound {
-    pub fn play_tone(&self, hz: u32) {
-        self.send.send((0,make_tone(hz))).unwrap();
+    pub fn update(&mut self) {
+        self.send.send((0,make_tone((1789773.0/(16.0*(self.timer as f32 + 1.0))) as u32))).unwrap();
+        if self.count == 127 { self.count = -128; }
+        self.count = self.count + 1;
+    }
+}
+
+impl Mem for NesSound {
+    fn read(&mut self, _mapper: &mut Box<Mapper>, addr: u16) -> u8 {
+        match addr as usize {
+            _ => 0
+        }
+    }
+
+    fn write(&mut self, mapper: &mut Box<Mapper>, addr: u16, val: u8) {
+//        println!("Write {:X} to {:X}", val, addr);
+        match addr as usize {
+            0x4002 => self.timer = (self.timer & 0xFF00) + (val as u16),
+            0x4003 => {
+                self.timer = self.timer & 0x00FF + (val as u16 & 0b00000111) << 4;
+                self.update()
+            },
+            _ => {}
+        }
     }
 }

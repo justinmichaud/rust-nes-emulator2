@@ -75,7 +75,6 @@ impl ControllerMethod for User {
                 Button::Keyboard(Key::S) => nes.chipset.controller1.b = false,
                 Button::Keyboard(Key::Return) => nes.chipset.controller1.start = false,
                 Button::Keyboard(Key::Space) => nes.chipset.controller1.select = false,
-                Button::Keyboard(Key::Q) => nes.chipset.sound.play_tone(440),
                 _ => ()
             }
         }
@@ -146,8 +145,11 @@ fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
         app.texture.update(&mut window.encoder,&app.canvas).unwrap();
         let tex = &app.texture;
 
+        let mut transform = None;
+
         window.draw_2d(&e, |ctx, g2d| {
-            graphics::image(tex, ctx.zoom(1.0/2.0).transform, g2d)
+            if transform.is_none() { transform = Some(ctx.zoom(1.0/2.0).transform); }
+            graphics::image(tex, transform.unwrap(), g2d)
         });
 
         //app.canvas.save(format!("{}.png", app.frames)).unwrap();
@@ -158,7 +160,8 @@ fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
 
 fn main() {
     let input: Box<ControllerMethod> = Box::new(User { dump_count: 0 });
-    match load_file("assets/smb.nes") {
+//    match load_file("assets/smb.nes") {
+    match load_file("assets/SNDTEST.NES") {
         Ok(rom) => emulate(rom, input),
         Err(e) => panic!("Error: {:?}", e)
     }
