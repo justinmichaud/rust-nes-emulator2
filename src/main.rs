@@ -7,6 +7,7 @@ extern crate opengl_graphics;
 extern crate image;
 extern crate graphics;
 extern crate piston_window;
+extern crate sdl2;
 
 use piston::input::*;
 use std::time::Instant;
@@ -22,6 +23,7 @@ mod nes;
 mod memory;
 mod ppu;
 mod settings;
+mod sound;
 
 mod mapper_0;
 
@@ -73,6 +75,7 @@ impl ControllerMethod for User {
                 Button::Keyboard(Key::S) => nes.chipset.controller1.b = false,
                 Button::Keyboard(Key::Return) => nes.chipset.controller1.start = false,
                 Button::Keyboard(Key::Space) => nes.chipset.controller1.select = false,
+                Button::Keyboard(Key::Q) => nes.chipset.sound.play_tone(440),
                 _ => ()
             }
         }

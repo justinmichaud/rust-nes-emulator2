@@ -4,6 +4,7 @@ use controller::*;
 use ppu::*;
 use std::io;
 use mapper_0::*;
+use sound::*;
 
 pub struct Nes {
     pub cpu: Cpu,
@@ -14,6 +15,7 @@ pub struct Chipset {
     pub mapper: Box<Mapper>,
     pub mem: Memory,
     pub ppu: Ppu,
+    pub sound: NesSound,
     pub controller1: Controller,
     pub controller2: Controller,
 
@@ -52,6 +54,7 @@ impl Nes {
                 mapper: mapper,
                 mem: mem,
                 ppu: Ppu::new(horiz_mapping),
+                sound: init_audio(),
                 ppu_dma_requested: false,
                 ppu_dma_val: 0,
                 controller1: Controller::new(),
