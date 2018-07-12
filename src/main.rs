@@ -94,7 +94,7 @@ struct App {
 fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box<ControllerMethod>) {
     println!("Loaded rom with {:?}", flags);
 
-    let size = [256*3, 240*3];
+    let size = [256, 240];
 
     let mut window: PistonWindow =
         WindowSettings::new("Emulator", size)

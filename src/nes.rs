@@ -66,7 +66,7 @@ impl Nes {
     }
 
     pub fn tick(&mut self) {
-        let frame_time = 262*341/3;
+        let frame_time = 1789773/60;
         while self.cpu.count < frame_time {
             if self.chipset.ppu_dma_requested {
                 self.chipset.ppu_dma_requested = false;
