@@ -247,6 +247,7 @@ pub struct Cpu {
     pub count: u32,
     pub debug: bool,
     nmi_waiting: bool,
+    irq_waiting: bool,
 }
 
 fn immediate(cpu: &mut Cpu, mem: &mut Chipset, _: bool) -> AddressModeResult {
@@ -765,6 +766,7 @@ impl Cpu {
             count: 0,
             debug: false,
             nmi_waiting: false,
+            irq_waiting: false,
             decimal: false,
         }
     }
@@ -812,8 +814,14 @@ impl Cpu {
             println!("State after: {:?}", self);
         }
 
-        if self.nmi_waiting {
-            self.nmi_waiting = false;
+        if self.nmi_waiting || (self.irq_waiting && !self.irq_disable) {
+            let addr = if self.nmi_waiting {
+                self.nmi_waiting = false;
+                mem.read16(0xFFFA)
+            } else {
+                self.irq_waiting = false;
+                mem.read16(0xFFFE)
+            };
 
             self.count += 7;
             let pc = self.pc;
@@ -825,12 +833,16 @@ impl Cpu {
             push(self, mem, p);
             self.interrupt = interrupt;
 
-            self.pc = mem.read16(0xFFFA);
+            self.pc = addr;
             self.irq_disable = true;
         }
     }
 
     pub fn nmi(&mut self) {
         self.nmi_waiting = true;
+    }
+
+    pub fn irq(&mut self) {
+        self.irq_waiting = true;
     }
 }

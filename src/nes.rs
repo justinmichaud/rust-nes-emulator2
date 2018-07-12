@@ -83,6 +83,7 @@ impl Nes {
 
             self.cpu.tick(&mut self.chipset);
             self.chipset.ppu.tick(&mut self.cpu, &mut self.chipset.mapper);
+            self.chipset.sound.tick(&mut self.cpu, &mut self.chipset.mapper);
 
             if self.cpu.debug {
                 if get_line().starts_with("d") {
