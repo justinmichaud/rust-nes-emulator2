@@ -143,7 +143,7 @@ impl NesSound {
 
 //                let envelope_clock = (apu_clock / APU_CYCLES_PER_ENVELOPE_CLOCK) as u32;
             let volume = if self.constant_volume[0] { 8 * self.volume[0] as u32 } else {
-                0//((envelope_clock % envelope_period) * 15 * 9) / envelope_period
+                128//((envelope_clock % envelope_period) * 15 * 9) / envelope_period
             };
             let sample = wave_pos * volume;
             data.push(sample as u8);
@@ -186,10 +186,10 @@ impl Mem for NesSound {
             }
             0x4006 => {
                 self.dirty = true;
-                self.timer[0] = (self.timer[0] & 0xFF00) + (val as u16);
+                self.timer[0] = (self.timer[0] & 0b11111111_00000000) | ((val as u16) & 0b00000000_11111111);
             }
             0x4007 => {
-                self.timer[0] = self.timer[0] & 0x00FF + (val as u16 & 0b00000111) << 4;
+                self.timer[0] = (self.timer[0] & 0b00000000_11111111) | ((val as u16 & 0b00000111) << 8);
                 self.length_counter[0] = *LENGTH_LOOKUP.get((val as usize & 0b11111000) >> 3).unwrap_or(&0);
                 self.dirty = true;
             }
