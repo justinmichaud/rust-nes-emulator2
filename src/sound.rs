@@ -132,26 +132,21 @@ impl NesSound {
     fn make_data(&self) -> SoundEnvelopeData {
         let mut data = vec![];
         let repeat = self.length_counter_halt[0];
-        let wave_apu_cycles_period = 4.0*16.0*(self.timer[0] as f64 + 1.0);
-        let wave_samples_period = (wave_apu_cycles_period / APU_CYCLES_PER_SAMPLE) as u32;
-        let envelope_period = self.volume[0] as u32 + 1;
+        let wave_apu_cycles_period = 8.0*(self.timer[0] as f64 + 1.0);
+        let wave_samples_period = wave_apu_cycles_period / APU_CYCLES_PER_SAMPLE;
+//        let envelope_period = self.volume[0] as u32 + 1;
 
 //        println!("Repeat: {} WaveSamplesPeriod: {}, EnvelopePeriod: {}", repeat, wave_samples_period, envelope_period);
 
-        let mut apu_clock = 0.0;
-        while wave_samples_period/2 > 0 && apu_clock <= self.length_counter[0] as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK {
-            for wave_pos in 0..=1 {
-                for _ in 0..wave_samples_period/2 {
-                    let envelope_clock = (apu_clock / APU_CYCLES_PER_ENVELOPE_CLOCK) as u32;
-                    let volume = if self.constant_volume[0] { 9 * self.volume[0] as u32 } else {
-                        255//((envelope_clock % envelope_period) * 15 * 9) / envelope_period
-                    };
-                    let sample = wave_pos * volume;
-                    data.push(sample as u8);
+        while data.len() as f64 * APU_CYCLES_PER_SAMPLE <= self.length_counter[0] as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK {
+            let wave_pos = if (data.len() as f64 % wave_samples_period) <= wave_samples_period/2.0 { 0 } else { 1 };
 
-                    apu_clock += APU_CYCLES_PER_SAMPLE;
-                }
-            }
+//                let envelope_clock = (apu_clock / APU_CYCLES_PER_ENVELOPE_CLOCK) as u32;
+            let volume = if self.constant_volume[0] { 8 * self.volume[0] as u32 } else {
+                0//((envelope_clock % envelope_period) * 15 * 9) / envelope_period
+            };
+            let sample = wave_pos * volume;
+            data.push(sample as u8);
         }
         (0, data, repeat)
     }
@@ -163,10 +158,10 @@ const LENGTH_LOOKUP: [u8; 32] = [10, 254, 20, 2, 40, 4, 80, 6,
     192, 24, 72, 26, 16, 28, 32, 30];
 // https://nesdoug.com/2015/12/02/14-intro-to-sound/
 // https://wiki.nesdev.com/w/index.php/APU
-const APU: f64 = 1789773.0*4.0;
+const APU: f64 = 1789773.0/2.0;
 const APU_CYCLES_PER_ENVELOPE_CLOCK: f64 = 3728.5;
 const APU_CYCLES_PER_SAMPLE: f64 = APU/SAMPLES_PER_SECOND as f64;
-const SAMPLES_PER_SECOND: u32 = 14551*4;//44100;
+const SAMPLES_PER_SECOND: u32 = 44100;
 
 impl Mem for NesSound {
     fn read(&mut self, _mapper: &mut Box<Mapper>, addr: u16) -> u8 {

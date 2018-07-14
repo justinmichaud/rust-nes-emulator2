@@ -160,8 +160,8 @@ fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
 
 fn main() {
     let input: Box<ControllerMethod> = Box::new(User { dump_count: 0 });
-    match load_file("assets/smb.nes") {
-//    match load_file("assets/SNDTEST.NES") {
+//    match load_file("assets/smb.nes") {
+    match load_file("assets/SNDTEST.NES") {
         Ok(rom) => emulate(rom, input),
         Err(e) => panic!("Error: {:?}", e)
     }
