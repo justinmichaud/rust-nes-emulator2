@@ -134,16 +134,18 @@ impl NesSound {
         let repeat = self.length_counter_halt[0];
         let wave_apu_cycles_period = 8.0*(self.timer[0] as f64 + 1.0);
         let wave_samples_period = wave_apu_cycles_period / APU_CYCLES_PER_SAMPLE;
-//        let envelope_period = self.volume[0] as u32 + 1;
+        let envelope_period = (self.volume[0] as f64 + 1.0) * APU_CYCLES_PER_ENVELOPE_CLOCK;
+
+        let note_duration_apu_cycles = self.length_counter[0] as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK;
 
 //        println!("Repeat: {} WaveSamplesPeriod: {}, EnvelopePeriod: {}", repeat, wave_samples_period, envelope_period);
 
-        while data.len() as f64 * APU_CYCLES_PER_SAMPLE <= self.length_counter[0] as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK {
+        while data.len() as f64 * APU_CYCLES_PER_SAMPLE <= note_duration_apu_cycles {
             let wave_pos = if (data.len() as f64 % wave_samples_period) <= wave_samples_period/2.0 { 0 } else { 1 };
 
-//                let envelope_clock = (apu_clock / APU_CYCLES_PER_ENVELOPE_CLOCK) as u32;
             let volume = if self.constant_volume[0] { 8 * self.volume[0] as u32 } else {
-                128//((envelope_clock % envelope_period) * 15 * 9) / envelope_period
+                let envelope_pos = data.len() as f64 / envelope_period as f64;
+                if envelope_pos > 1.0 { 0 } else { ((1.0 - envelope_pos) * 15.0 * 9.0) as u32 }
             };
             let sample = wave_pos * volume;
             data.push(sample as u8);
