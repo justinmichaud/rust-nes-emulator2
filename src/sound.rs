@@ -36,7 +36,7 @@ pub fn init_audio(sdl: Sdl) -> NesSound {
         envelope_timer_samples: 0,
         wave_timer_samples: 0,
         length_counter_samples: 0,
-        length_counter: 0,
+        length_counter_orig: 0,
         length_counter_halt: false,
         volume: 0,
         constant_volume: false,
@@ -64,12 +64,13 @@ pub fn init_audio(sdl: Sdl) -> NesSound {
     }
 }
 
+#[derive(Debug)]
 struct NesApuState {
     envelope_timer_samples: u32,
     wave_timer_samples: u32,
     length_counter_samples: u32,
 
-    length_counter: u8,
+    length_counter_orig: u8,
     length_counter_halt: bool,
     volume: u8,
     constant_volume: bool,
@@ -79,37 +80,38 @@ struct NesApuState {
 impl NesApuState {
     fn tick(&mut self) -> u32 {
         let wave_samples_period = 8.0*(self.timer as f64 + 1.0) / APU_CYCLES_PER_SAMPLE;
-        let envelope_samples_period = (self.volume as f64 + 1.0) * APU_CYCLES_PER_ENVELOPE_CLOCK / APU_CYCLES_PER_SAMPLE;
-        let note_duration_samples = self.length_counter as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK / APU_CYCLES_PER_SAMPLE;
+        let envelope_samples_period = (self.volume as f64 + 1.0) * 15.0 * APU_CYCLES_PER_ENVELOPE_CLOCK / APU_CYCLES_PER_SAMPLE;
 
         let wave_pos = if (self.wave_timer_samples as f64 % wave_samples_period) <= wave_samples_period/2.0 { 0 } else { 1 };
+        let envelope_pos = if self.length_counter_halt {
+            (self.envelope_timer_samples as f64 % envelope_samples_period) / envelope_samples_period
+        } else {
+            self.envelope_timer_samples as f64 / envelope_samples_period
+        };
 
         let volume = if self.constant_volume { 8 * self.volume as u32 } else {
-            let envelope_pos = if self.length_counter_halt {
-                (self.envelope_timer_samples as f64 % envelope_samples_period) / envelope_samples_period
-            } else {
-                self.envelope_timer_samples as f64 / envelope_samples_period
-            };
             if envelope_pos > 1.0 { 0 } else {
                 ((1.0 - envelope_pos) * 15.0 * 8.0) as u32
             }
         };
 
-        let length_counter_now = if self.length_counter_halt { self.length_counter } else {
-            let pos = self.length_counter_samples as f64 / note_duration_samples;
-            if pos > 1.0 { 0 } else { self.length_counter }
-        };
-
-        let sample = if length_counter_now > 0 && self.timer > 8 {
+        let sample = if self.length_counter() > 0 && self.timer > 8 {
             wave_pos * volume
         } else { 0 };
 
-        self.length_counter = length_counter_now;
         self.envelope_timer_samples += 1;
         self.wave_timer_samples += 1;
         self.length_counter_samples += 1;
 
         sample
+    }
+
+    fn length_counter(&self) -> u8 {
+        let note_duration_samples = self.length_counter_orig as f64 * 2.0 * APU_CYCLES_PER_ENVELOPE_CLOCK / APU_CYCLES_PER_SAMPLE;
+        if self.length_counter_halt { self.length_counter_orig } else {
+            let pos = self.length_counter_samples as f64 / note_duration_samples;
+            if pos > 1.0 { 0 } else { self.length_counter_orig }
+        }
     }
 }
 
@@ -146,7 +148,7 @@ impl Mem for NesSound {
 
                 let old_counter_inhibit = if self.frame_counter_inhibit {1} else {0};
                 self.frame_counter_inhibit = false;
-                (old_counter_inhibit << 6) | (if state.length_counter > 0 { 0b00000001 } else {0})
+                (old_counter_inhibit << 6) | (if state.length_counter() > 0 { 0b00000001 } else {0})
             }
             _ => 0
         }
@@ -160,16 +162,15 @@ impl Mem for NesSound {
                 state.length_counter_halt = (val&0b00100000) != 0;
                 state.constant_volume = (val&0b00010000) != 0;
                 state.volume = val&0b00001111;
-                state.length_counter_samples = 0;
-                state.envelope_timer_samples = 0;
             }
+//            0x4005 => println!("Unsupported write to {:X}: {:b}", addr, val),
             0x4006 => {
                 state.timer = (state.timer & 0b11111111_00000000) | ((val as u16) & 0b00000000_11111111);
                 state.wave_timer_samples = 0;
             }
             0x4007 => {
                 state.timer = (state.timer & 0b00000000_11111111) | ((val as u16 & 0b00000111) << 8);
-                state.length_counter = *LENGTH_LOOKUP.get((val as usize & 0b11111000) >> 3).unwrap_or(&0);
+                state.length_counter_orig = *LENGTH_LOOKUP.get((val as usize & 0b11111000) >> 3).unwrap_or(&0);
                 state.length_counter_samples = 0;
                 state.envelope_timer_samples = 0;
                 state.wave_timer_samples = 0;
@@ -180,5 +181,6 @@ impl Mem for NesSound {
             }
             _ => {}
         }
+        if [0x4004, 0x4006, 0x4007].contains(&addr) { println!("State: {:?}", *state); }
     }
 }
