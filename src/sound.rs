@@ -36,11 +36,17 @@ pub fn init_audio(sdl: Sdl) -> NesSound {
         envelope_timer_samples: 0,
         wave_timer_samples: 0,
         length_counter_samples: 0,
+        sweep_counter_samples: 0,
         length_counter_orig: 0,
         length_counter_halt: false,
         volume: 0,
         constant_volume: false,
         timer: 0,
+        sweep_enabled: false,
+        sweep_period: 0,
+        sweep_shift: 0,
+        sweep_negate: false,
+        mute: false,
     };
 
     let arc = Arc::new(Mutex::new(apu_state));
@@ -69,17 +75,30 @@ struct NesApuState {
     envelope_timer_samples: u32,
     wave_timer_samples: u32,
     length_counter_samples: u32,
+    sweep_counter_samples: u32,
 
     length_counter_orig: u8,
     length_counter_halt: bool,
     volume: u8,
     constant_volume: bool,
     timer: u16,
+    sweep_enabled: bool,
+    sweep_period: u8,
+    sweep_shift: u8,
+    sweep_negate: bool,
+    mute: bool,
 }
 
 impl NesApuState {
     fn tick(&mut self) -> u32 {
-        let wave_samples_period = 8.0*(self.timer as f64 + 1.0) / APU_CYCLES_PER_SAMPLE;
+        let target_timer = if !self.sweep_enabled { self.timer } else {
+            if self.sweep_negate {
+                self.timer - (self.timer >> self.sweep_shift)
+            } else {
+                self.timer + (self.timer >> self.sweep_shift)
+            }
+        };
+        let wave_samples_period = 8.0*(target_timer as f64 + 1.0) / APU_CYCLES_PER_SAMPLE;
         let envelope_samples_period = (self.volume as f64 + 1.0) * 15.0 * APU_CYCLES_PER_ENVELOPE_CLOCK / APU_CYCLES_PER_SAMPLE;
 
         let wave_pos = if (self.wave_timer_samples as f64 % wave_samples_period) <= wave_samples_period/2.0 { 0 } else { 1 };
@@ -95,13 +114,18 @@ impl NesApuState {
             }
         };
 
-        let sample = if self.length_counter() > 0 && self.timer > 8 {
+        if target_timer < 8 || target_timer > 0x07FF {
+            self.mute = true;
+        }
+
+        let sample = if self.length_counter() > 0 && self.timer > 8 && !self.mute {
             wave_pos * volume
         } else { 0 };
 
         self.envelope_timer_samples += 1;
         self.wave_timer_samples += 1;
         self.length_counter_samples += 1;
+        self.sweep_counter_samples += 1;
 
         sample
     }
@@ -162,11 +186,21 @@ impl Mem for NesSound {
                 state.length_counter_halt = (val&0b00100000) != 0;
                 state.constant_volume = (val&0b00010000) != 0;
                 state.volume = val&0b00001111;
+                state.mute = false;
             }
-//            0x4005 => println!("Unsupported write to {:X}: {:b}", addr, val),
+            0x4005 => {
+                state.sweep_enabled = (val&0b10000000) != 0;
+                state.sweep_period = (val&0b01110000)>>4;
+                state.sweep_negate = (val&0b00001000) != 0;
+                state.sweep_shift = val&0b00000111;
+                state.sweep_counter_samples = 0;
+                state.mute = false;
+                if state.sweep_enabled { println!("Sweep enabled"); }
+            }
             0x4006 => {
                 state.timer = (state.timer & 0b11111111_00000000) | ((val as u16) & 0b00000000_11111111);
                 state.wave_timer_samples = 0;
+                state.mute = false;
             }
             0x4007 => {
                 state.timer = (state.timer & 0b00000000_11111111) | ((val as u16 & 0b00000111) << 8);
@@ -174,6 +208,8 @@ impl Mem for NesSound {
                 state.length_counter_samples = 0;
                 state.envelope_timer_samples = 0;
                 state.wave_timer_samples = 0;
+                state.sweep_counter_samples = 0;
+                state.mute = false;
             }
             0x4017 => {
                 self.frame_counter_mode = (val&0b10000000)>>7;
@@ -181,6 +217,6 @@ impl Mem for NesSound {
             }
             _ => {}
         }
-        if [0x4004, 0x4006, 0x4007].contains(&addr) { println!("State: {:?}", *state); }
+//        if [0x4004, 0x4006, 0x4007].contains(&addr) { println!("State: {:?}", *state); }
     }
 }
