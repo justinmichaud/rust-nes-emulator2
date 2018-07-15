@@ -13,6 +13,9 @@ piston_window = "0.80.0"
 image = "0.19.0"
 rand = "0.5.3"
 
+[dependencies.pistoncore-sdl2_window]
+git = "https://github.com/PistonDevelopers/sdl2_window"
+
 [dependencies.sdl2]
 version = "0.31.0"
 default-features = false

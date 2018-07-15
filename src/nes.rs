@@ -5,6 +5,7 @@ use ppu::*;
 use std::io;
 use mapper_0::*;
 use sound::*;
+use sdl2::Sdl;
 
 pub struct Nes {
     pub cpu: Cpu,
@@ -37,7 +38,7 @@ fn get_line() -> String {
 
 impl Nes {
     pub fn new(prg: Vec<u8>, mut chr: Vec<u8>, mapper: u8, prg_ram_size: usize,
-               horiz_mapping: bool) -> Nes {
+               horiz_mapping: bool, sdl: Sdl) -> Nes {
         if chr.len() == 0 {
             chr = vec![0; 8*1024];
         }
@@ -54,7 +55,7 @@ impl Nes {
                 mapper: mapper,
                 mem: mem,
                 ppu: Ppu::new(horiz_mapping),
-                sound: init_audio(),
+                sound: init_audio(sdl),
                 ppu_dma_requested: false,
                 ppu_dma_val: 0,
                 controller1: Controller::new(),

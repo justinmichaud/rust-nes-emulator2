@@ -7,6 +7,7 @@ extern crate opengl_graphics;
 extern crate image;
 extern crate graphics;
 extern crate piston_window;
+extern crate sdl2_window;
 extern crate sdl2;
 
 use piston::input::*;
@@ -15,6 +16,7 @@ use piston::window::WindowSettings;
 use opengl_graphics::OpenGL;
 use piston::event_loop::*;
 use piston_window::*;
+use sdl2_window::Sdl2Window;
 
 mod cpu;
 mod ines;
@@ -94,17 +96,23 @@ struct App {
 fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box<ControllerMethod>) {
     println!("Loaded rom with {:?}", flags);
 
-    let size = [256, 240];
+    let size = [256*4, 240*4];
 
-    let mut window: PistonWindow =
-        WindowSettings::new("Emulator", size)
+    let sdl = sdl2::init().unwrap();
+    let video_subsystem = sdl.video().unwrap();
+
+    let mut window = PistonWindow::new(OpenGL::V3_2, 1, Sdl2Window::with_subsystem(
+        video_subsystem,
+        &WindowSettings::new("Emulator", size)
             .opengl(OpenGL::V3_2)
-            .exit_on_esc(true).build().unwrap();
+            .vsync(false)
+            .exit_on_esc(true)
+    ).unwrap());
 
-    let nes = Nes::new(prg, chr, flags.mapper, flags.prg_ram_size, flags.horiz_mirroring);
+    let nes = Nes::new(prg, chr, flags.mapper, flags.prg_ram_size, flags.horiz_mirroring, sdl);
 
     let canvas = make_canvas(size[0], size[1]);
-    let tex = Texture::from_image(&mut window.factory,&canvas, &TextureSettings::new()).unwrap();
+    let tex = Texture::from_image(&mut window.factory, &canvas, &TextureSettings::new()).unwrap();
 
     let mut app = App {
         nes: nes,
@@ -116,19 +124,26 @@ fn emulate((flags, prg, chr) : (Flags, Vec<u8>, Vec<u8>), controller_method: Box
         canvas: canvas,
     };
 
-    let mut events = Events::new(EventSettings::new());
+    let mut events = Events::new({
+        let mut es = EventSettings::new();
+        es.max_fps = 60;
+        es.ups = 60;
+        es
+    });
     while let Some(e) = events.next(&mut window) {
         handle_event(&mut window, e, &mut app);
     }
 }
 
-fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
+fn handle_event(window: &mut PistonWindow<Sdl2Window>, e: Event, app: &mut App) {
     if let Some(size) = e.resize_args() {
         app.canvas = make_canvas(size[0] as u32, size[1] as u32);
         app.texture = Texture::from_image(&mut window.factory,&app.canvas, &TextureSettings::new()).unwrap();
     }
 
-    if let Some(_args) = e.render_args() {
+    app.controller_method.as_mut().do_input(&mut app.nes, &e);
+
+    if let Some(_args) = e.update_args() {
         app.frames += 1;
 
         if app.frames > 60 {
@@ -141,27 +156,24 @@ fn handle_event(window: &mut PistonWindow, e: Event, app: &mut App) {
 
         app.nes.tick();
         app.nes.prepare_draw(&mut app.canvas);
+    }
 
+    if let Some(_args) = e.render_args() {
         app.texture.update(&mut window.encoder,&app.canvas).unwrap();
         let tex = &app.texture;
 
-        let mut transform = None;
-
         window.draw_2d(&e, |ctx, g2d| {
-            if transform.is_none() { transform = Some(ctx.zoom(1.0/2.0).transform); }
-            graphics::image(tex, transform.unwrap(), g2d)
+            graphics::image(tex, ctx.transform, g2d)
         });
 
         //app.canvas.save(format!("{}.png", app.frames)).unwrap();
     }
-
-    app.controller_method.as_mut().do_input(&mut app.nes, &e);
 }
 
 fn main() {
     let input: Box<ControllerMethod> = Box::new(User { dump_count: 0 });
-//    match load_file("assets/smb.nes") {
-    match load_file("assets/SNDTEST.NES") {
+    match load_file("assets/smb.nes") {
+//    match load_file("assets/SNDTEST.NES") {
         Ok(rom) => emulate(rom, input),
         Err(e) => panic!("Error: {:?}", e)
     }
