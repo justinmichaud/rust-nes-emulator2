@@ -3,7 +3,9 @@ target
 *.iml
 donkey_kong.nes
 smb.nes
+smb2.nes
 smb3.nes
+zelda.nes
 *.data
 *.js
 *.wasm

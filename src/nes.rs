@@ -4,6 +4,7 @@ use controller::*;
 use ppu::*;
 use std::io;
 use mapper_0::*;
+use mapper_4::*;
 use sound::*;
 use sdl2::Sdl;
 
@@ -46,7 +47,8 @@ impl Nes {
         let mut mem = Memory::new();
         let mut mapper = match mapper {
             0 => Box::new(Mapper0::new(prg, prg_ram_size, chr)) as Box<Mapper>,
-            _ => panic!()
+            4 => Box::new(Mapper4::new(prg, prg_ram_size, chr)) as Box<Mapper>,
+            _ => panic!("Mapper: {}", mapper)
         };
 
         Nes {
