@@ -1,11 +1,20 @@
 use memory::*;
 use cpu::Cpu;
+use std::fmt::Debug;
+use std::fmt::Error;
+use std::fmt::Formatter;
 
 #[derive(Clone)]
 pub struct Mapper0 {
     prg: Vec<u8>,
     prg_ram: Vec<u8>,
     chr: Vec<u8>,
+}
+
+impl Debug for Mapper0 {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "Mapper 0")
+    }
 }
 
 impl Mapper0 {

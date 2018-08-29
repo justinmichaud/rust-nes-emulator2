@@ -694,7 +694,7 @@ fn manual(cpu: &mut Cpu, mem: &mut Chipset, op: u8) {
         },
         0xF8 => cpu.decimal = true,
         0xD8 => cpu.decimal = false,
-        _ => panic!("Not implemented yet! Op: {:X} at {:X}", op, cpu.pc.wrapping_sub(1))
+        _ => panic!("Not implemented yet! Op: {:X} at {:X}, chipset {:?}", op, cpu.pc.wrapping_sub(1), mem.mapper)
     }
 }
 

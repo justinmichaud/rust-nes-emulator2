@@ -1,5 +1,8 @@
 use memory::*;
 use cpu::Cpu;
+use std::fmt::Error;
+use std::fmt::Formatter;
+use std::fmt::Debug;
 
 #[derive(Clone)]
 pub struct Mapper4 {
@@ -19,6 +22,18 @@ pub struct Mapper4 {
     irq_reload: bool,
     dirty: bool,
 }
+
+impl Debug for Mapper4 {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.debug_struct("Mapper 4")
+            .field("registers", &self.registers)
+            .field("prg_rom_bank_mode", &self.prg_rom_bank_mode)
+            .field("chr_inversion", &self.chr_inversion)
+            .field("horizontal_mirroring", &self.horizontal_mirroring)
+            .finish()
+    }
+}
+
 
 impl Mapper4 {
     pub fn new(prg: Vec<u8>, prg_ram_size: usize, chr: Vec<u8>) -> Mapper4 {

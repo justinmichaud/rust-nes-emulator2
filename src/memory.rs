@@ -1,8 +1,9 @@
 use std::ops::RangeInclusive;
 use cpu::Cpu;
 use objekt;
+use std::fmt::Debug;
 
-pub trait Mapper: objekt::Clone {
+pub trait Mapper: objekt::Clone + Debug {
     fn read(&mut self, addr: u16) -> u8;
 
     fn write(&mut self, addr: u16, val: u8);
