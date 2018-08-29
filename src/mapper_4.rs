@@ -1,6 +1,7 @@
 use memory::*;
 use cpu::Cpu;
 
+#[derive(Clone)]
 pub struct Mapper4 {
     prg: Vec<u8>,
     prg_ram: Vec<u8>,
@@ -16,6 +17,7 @@ pub struct Mapper4 {
     irq_counter_reload: u8,
     irq_enable: bool,
     irq_reload: bool,
+    dirty: bool,
 }
 
 impl Mapper4 {
@@ -35,6 +37,7 @@ impl Mapper4 {
             irq_counter_reload: 0,
             irq_enable: false,
             irq_reload: false,
+            dirty: false,
         }
     }
 }
@@ -95,6 +98,7 @@ impl Mapper for Mapper4 {
                 panic!("Write to invalid mapper 4 address {:X}", addr);
             }
         }
+        self.dirty = true;
     }
 
     fn read_ppu(&mut self, addr: u16) -> u8 {
@@ -143,7 +147,7 @@ impl Mapper for Mapper4 {
         self.horizontal_mirroring
     }
 
-    fn ppu_scanline(&mut self, cpu: &mut Cpu) {
+    fn ppu_scanline(&mut self, cpu: &mut Cpu) -> bool {
         if self.irq_reload || self.irq_counter == 0 {
             self.irq_reload = false;
             self.irq_counter = self.irq_counter_reload;
@@ -153,6 +157,13 @@ impl Mapper for Mapper4 {
 
         if self.irq_counter == 0 && self.irq_enable {
             cpu.irq();
+        }
+
+        if self.dirty {
+            self.dirty = false;
+            true
+        } else {
+            false
         }
     }
 }

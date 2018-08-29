@@ -1,7 +1,8 @@
 use std::ops::RangeInclusive;
 use cpu::Cpu;
+use objekt;
 
-pub trait Mapper {
+pub trait Mapper: objekt::Clone {
     fn read(&mut self, addr: u16) -> u8;
 
     fn write(&mut self, addr: u16, val: u8);
@@ -12,7 +13,7 @@ pub trait Mapper {
 
     fn horizontal_mirroring(&self, rom_val: bool) -> bool;
 
-    fn ppu_scanline(&mut self, cpu: &mut Cpu);
+    fn ppu_scanline(&mut self, cpu: &mut Cpu) -> bool;
 }
 
 pub trait Mem {

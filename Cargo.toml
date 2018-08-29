@@ -12,6 +12,7 @@ piston2d-opengl_graphics = "0.53.0"
 piston_window = "0.80.0"
 image = "0.19.0"
 rand = "0.5.3"
+objekt = "0.1.1"
 
 [dependencies.pistoncore-sdl2_window]
 git = "https://github.com/PistonDevelopers/sdl2_window"

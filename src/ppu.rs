@@ -3,6 +3,7 @@ use cpu::*;
 use std::cmp;
 use image;
 use memory::*;
+use objekt;
 
 pub type NesImageBuffer = image::ImageBuffer<image::Rgba<u8>, Vec<u8>>;
 
@@ -88,6 +89,8 @@ struct MidframeState {
     greyscale: bool,
     show_background: bool,
     show_sprites: bool,
+
+    mapper: Box<Mapper>,
 }
 
 pub struct Ppu {
@@ -192,11 +195,11 @@ impl Ppu {
 
             states: vec![],
             has_drawn_sprite0_background: false,
-            last_ticked_scanline: 255,
+            last_ticked_scanline: 0,
         }
     }
 
-    fn make_midframe_state(&self, count: u32) -> MidframeState {
+    fn make_midframe_state(&self, count: u32, mapper: &Box<Mapper>) -> MidframeState {
         MidframeState {
             count: count,
             nametable: self.nametable,
@@ -208,11 +211,12 @@ impl Ppu {
             greyscale: self.greyscale,
             show_background: self.show_background,
             show_sprites: self.show_sprites,
+            mapper: objekt::clone_box(&**mapper),
         }
     }
 
-    pub fn push_state(&mut self, cpu: &Cpu) {
-        let state = self.make_midframe_state(cpu.count);
+    pub fn push_state(&mut self, cpu: &Cpu, mapper: &Box<Mapper>) {
+        let state = self.make_midframe_state(cpu.count, mapper);
         self.states.push(state);
     }
 
@@ -255,7 +259,7 @@ impl Ppu {
                 self.sprite_size            = (val&0b00100000)>>5;
                 self.ppu_mss                = val&0b01000000>0;
                 self.generate_nmi           = val&0b10000000>0;
-                self.push_state(cpu);
+                self.push_state(cpu, mapper);
             }
             0x2001 => {
                 self.greyscale              = val&0b00000001>0;
@@ -266,7 +270,7 @@ impl Ppu {
                 self.em_red                 = val&0b00100000>0;
                 self.em_green               = val&0b01000000>0;
                 self.em_blue                = val&0b10000000>0;
-                self.push_state(cpu);
+                self.push_state(cpu, mapper);
             }
             0x2003 => self.oamaddr = val,
             0x2004 => {
@@ -279,7 +283,7 @@ impl Ppu {
                 }
                 else {
                     self.ppuscroll_x = val;
-                    self.push_state(cpu);
+                    self.push_state(cpu, mapper);
                 }
                 self.ppuscroll_ppuaddr_pick = !self.ppuscroll_ppuaddr_pick;
             },
@@ -291,7 +295,7 @@ impl Ppu {
                     let nametable = (self.ppuaddr_hi&0b00001100)>>2;
                     if nametable != self.nametable {
                         self.nametable = nametable;
-                        self.push_state(cpu);
+                        self.push_state(cpu, mapper);
                     }
                 }
                 else {
@@ -326,17 +330,11 @@ impl Ppu {
     pub fn tick(&mut self, cpu: &mut Cpu, mapper: &mut Box<Mapper>) {
         let y = cpu.count*3/341;
 
-        if y < self.last_ticked_scanline {
-            while self.last_ticked_scanline <= 241 {
-                self.last_ticked_scanline += 1;
-                mapper.ppu_scanline(cpu);
-            }
-            self.last_ticked_scanline = 0;
-        }
-
-        while self.last_ticked_scanline < y && self.last_ticked_scanline < 241 {
+        while self.last_ticked_scanline < y && self.last_ticked_scanline < 262 {
             self.last_ticked_scanline += 1;
-            mapper.ppu_scanline(cpu);
+            if y > 0 && y < 241 {
+                if mapper.ppu_scanline(cpu) { self.push_state(cpu, mapper); }
+            }
         }
 
         if y < VBL && !self.has_blanked {
@@ -356,7 +354,7 @@ impl Ppu {
             self.sprite_0_hit = false;
 
             self.states.clear();
-            self.push_state(cpu);
+            self.push_state(cpu, mapper);
         }
 
         let sprite_0_y = self.oam[self.oamaddr as usize] as u32 + 1;
@@ -479,7 +477,8 @@ impl Ppu {
     }
 
     fn draw_with_state(&mut self, state_idx: usize, state_start_y: u16, state_end_y: u16,
-                       mapper: &mut Box<Mapper>) {
+                       _: &mut Box<Mapper>) {
+        let mut current_mapper = objekt::clone_box(&*self.states[state_idx].mapper);
         let sx = self.states[state_idx].ppuscroll_x as u16;
         let sy = self.states[state_idx].ppuscroll_y as u16;
         let base_nt = self.states[state_idx].nametable;
@@ -523,7 +522,7 @@ impl Ppu {
                 }
 
                 self.draw_tile(state_idx, n, tile_x, tile_y, start_x, start_y, end_x, end_y,
-                          off_x, off_y, mapper);
+                          off_x, off_y, &mut current_mapper);
             }
         }
 
@@ -536,8 +535,8 @@ impl Ppu {
 
             for i in 0..(height/8) {
                 for py in 0..8 {
-                    let lo = self.read(mapper, pattern_addr + 16*i as u16 + py);
-                    let hi = self.read(mapper, pattern_addr + 16*i as u16 + py + 8);
+                    let lo = self.read(&mut current_mapper, pattern_addr + 16*i as u16 + py);
+                    let hi = self.read(&mut current_mapper, pattern_addr + 16*i as u16 + py + 8);
 
                     for px in 0..8 {
                         let real_x = if !fh {
@@ -580,6 +579,9 @@ impl Ppu {
     }
 
     pub fn prepare_draw(&mut self, mapper: &mut Box<Mapper>) {
+        if self.last_ticked_scanline != 262 { panic!("Last ticked scanline is {}", self.last_ticked_scanline); }
+        self.last_ticked_scanline = 0;
+
         for x in 0..self.output_canvas.width() {
             for y in 0..self.output_canvas.height() {
                 self.sprite_output[x as usize][y as usize] = 0;

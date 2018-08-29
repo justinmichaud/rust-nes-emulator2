@@ -1,6 +1,7 @@
 use memory::*;
 use cpu::Cpu;
 
+#[derive(Clone)]
 pub struct Mapper0 {
     prg: Vec<u8>,
     prg_ram: Vec<u8>,
@@ -77,5 +78,5 @@ impl Mapper for Mapper0 {
         rom_val
     }
 
-    fn ppu_scanline(&mut self, _: &mut Cpu) { }
+    fn ppu_scanline(&mut self, _: &mut Cpu) -> bool { false }
 }
