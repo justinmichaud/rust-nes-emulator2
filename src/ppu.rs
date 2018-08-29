@@ -600,9 +600,9 @@ impl Ppu {
                 };
 
                 let hsv = (self.read(mapper, p_idx) & mask) as usize;
-                self.output_canvas.put_pixel(x, y, image::Rgba([PALETTE[hsv * 3],
-                    PALETTE[hsv * 3 + 1],
-                    PALETTE[hsv * 3 + 2], 0xFF]));
+                self.output_canvas.put_pixel(x, y, image::Rgba([*PALETTE.get(hsv * 3).unwrap_or(&0),
+                    *PALETTE.get(hsv * 3 + 1).unwrap_or(&0),
+                    *PALETTE.get(hsv * 3 + 2).unwrap_or(&0), 0xFF]));
             }
         }
     }
@@ -635,14 +635,14 @@ impl Mem for Ppu {
             },
             0x2000..=0x23FF => self.vram[addr as usize - 0x2000],
             0x2400..=0x27FF => {
-                if self.horiz_mapping {
+                if mapper.horizontal_mirroring(self.horiz_mapping) {
                     self.vram[addr as usize - 0x2400]
                 } else {
                     self.vram[addr as usize - 0x2000]
                 }
             },
             0x2800..=0x2BFF => {
-                if self.horiz_mapping {
+                if mapper.horizontal_mirroring(self.horiz_mapping) {
                     self.vram[addr as usize - 0x2400]
                 } else {
                     self.vram[addr as usize - 0x2800]
@@ -668,14 +668,14 @@ impl Mem for Ppu {
             0x0000..=0x1FFF => mapper.write_ppu(addr, val),
             0x2000..=0x23FF => self.vram[addr as usize - 0x2000] = val,
             0x2400..=0x27FF => {
-                if self.horiz_mapping {
+                if mapper.horizontal_mirroring(self.horiz_mapping) {
                     self.vram[addr as usize - 0x2400] = val;
                 } else {
                     self.vram[addr as usize - 0x2000] = val;
                 }
             },
             0x2800..=0x2BFF => {
-                if self.horiz_mapping {
+                if mapper.horizontal_mirroring(self.horiz_mapping) {
                     self.vram[addr as usize - 0x2400] = val;
                 } else {
                     self.vram[addr as usize - 0x2800] = val;

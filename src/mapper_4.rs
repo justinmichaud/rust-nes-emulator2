@@ -9,6 +9,8 @@ pub struct Mapper4 {
     register_to_update: u8,
     prg_rom_bank_mode: bool,
     chr_inversion: bool,
+
+    horizontal_mirroring: bool,
 }
 
 impl Mapper4 {
@@ -22,6 +24,8 @@ impl Mapper4 {
             register_to_update: 0,
             prg_rom_bank_mode: false,
             chr_inversion: false,
+
+            horizontal_mirroring: true,
         }
     }
 }
@@ -47,7 +51,7 @@ impl Mapper for Mapper4 {
                     self.registers[6] as usize
                 };
 
-                self.prg[bank * 0x2000 + addr as usize - 0x8000]
+                self.prg[bank * 0x2000 + addr as usize - 0xC000]
             },
             0xE000 ..= 0xFFFF => self.prg[self.prg.len() - 0x2000 + addr as usize - 0xE000], // Last bank
             _ => {
@@ -69,7 +73,9 @@ impl Mapper for Mapper4 {
                     self.registers[self.register_to_update as usize] = val;
                 }
             },
-            0xA000 ..= 0xBFFF => {}
+            0xA000 ..= 0xBFFF => if addr%2 == 0 { //mirroring
+                self.horizontal_mirroring = val != 0;
+            }
             0xC000 ..= 0xDFFF => {}
             0xE000 ..= 0xFFFF => {}
             _ => {
@@ -118,39 +124,13 @@ impl Mapper for Mapper4 {
 
     fn write_ppu(&mut self, addr: u16, val: u8) {
         match addr {
-            0x0000..=0x1FFF => {
-                let bank = if self.chr_inversion {
-                    match addr {
-                        0x0000 ..= 0x03FF => self.registers[2],
-                        0x0400 ..= 0x07FF => self.registers[3],
-                        0x0800 ..= 0x0BFF => self.registers[4],
-                        0x0C00 ..= 0x0FFF => self.registers[5],
-                        0x1000 ..= 0x13FF => self.registers[0]&0xFE,
-                        0x1400 ..= 0x17FF => self.registers[0]|0x1,
-                        0x1800 ..= 0x1BFF => self.registers[1]&0xFE,
-                        0x1C00 ..= 0x1FFF => self.registers[1]|0x1,
-                        _ => panic!()
-                    }
-                } else {
-                    match addr {
-                        0x0000 ..= 0x03FF => self.registers[0]&0xFE,
-                        0x0400 ..= 0x07FF => self.registers[0]|0x1,
-                        0x0800 ..= 0x0BFF => self.registers[1]&0xFE,
-                        0x0C00 ..= 0x0FFF => self.registers[1]|0x1,
-                        0x1000 ..= 0x13FF => self.registers[2],
-                        0x1400 ..= 0x17FF => self.registers[3],
-                        0x1800 ..= 0x1BFF => self.registers[4],
-                        0x1C00 ..= 0x1FFF => self.registers[5],
-                        _ => panic!()
-                    }
-                } as usize;
-                let block = (addr as usize / 0x400) * 0x400;
-
-                self.chr[bank * 0x400 + addr as usize - block] = val;
-            }
             _ => {
-                panic!("Reference to invalid mapper 4 ppu address {:X}", addr);
+                panic!("Write to invalid mapper 4 ppu address {:X}", addr);
             }
         }
+    }
+
+    fn horizontal_mirroring(&self, rom_val: bool) -> bool {
+        self.horizontal_mirroring
     }
 }

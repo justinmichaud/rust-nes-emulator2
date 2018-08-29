@@ -71,4 +71,8 @@ impl Mapper for Mapper0 {
             }
         }
     }
+
+    fn horizontal_mirroring(&self, rom_val: bool) -> bool {
+        rom_val
+    }
 }
