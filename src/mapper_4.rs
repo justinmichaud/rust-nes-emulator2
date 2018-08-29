@@ -1,4 +1,5 @@
 use memory::*;
+use cpu::Cpu;
 
 pub struct Mapper4 {
     prg: Vec<u8>,
@@ -11,6 +12,10 @@ pub struct Mapper4 {
     chr_inversion: bool,
 
     horizontal_mirroring: bool,
+    irq_counter: u8,
+    irq_counter_reload: u8,
+    irq_enable: bool,
+    irq_reload: bool,
 }
 
 impl Mapper4 {
@@ -26,6 +31,10 @@ impl Mapper4 {
             chr_inversion: false,
 
             horizontal_mirroring: true,
+            irq_counter: 0,
+            irq_counter_reload: 0,
+            irq_enable: false,
+            irq_reload: false,
         }
     }
 }
@@ -38,17 +47,17 @@ impl Mapper for Mapper4 {
                 let bank = if self.prg_rom_bank_mode {
                     self.prg.len() / 0x2000 - 2 // second-last bank
                 } else {
-                    self.registers[6] as usize
+                    self.registers[6] as usize & 0b0011_1111
                 };
 
                 self.prg[bank * 0x2000 + addr as usize - 0x8000]
             },
-            0xA000 ..= 0xBFFF => self.prg[self.registers[7] as usize * 0x2000 + addr as usize - 0xA000],
+            0xA000 ..= 0xBFFF => self.prg[(self.registers[7] as usize & 0b00111111) * 0x2000 + addr as usize - 0xA000],
             0xC000 ..= 0xDFFF => {
                 let bank = if !self.prg_rom_bank_mode {
                     self.prg.len() / 0x2000 - 2 // second-last bank
                 } else {
-                    self.registers[6] as usize
+                    self.registers[6] as usize & 0b0011_1111
                 };
 
                 self.prg[bank * 0x2000 + addr as usize - 0xC000]
@@ -76,8 +85,12 @@ impl Mapper for Mapper4 {
             0xA000 ..= 0xBFFF => if addr%2 == 0 { //mirroring
                 self.horizontal_mirroring = val != 0;
             }
-            0xC000 ..= 0xDFFF => {}
-            0xE000 ..= 0xFFFF => {}
+            0xC000 ..= 0xDFFF => if addr%2 == 0 {
+                self.irq_counter_reload = val;
+            } else {
+                self.irq_reload = true;
+            }
+            0xE000 ..= 0xFFFF => self.irq_enable = addr%2 != 0,
             _ => {
                 panic!("Write to invalid mapper 4 address {:X}", addr);
             }
@@ -123,14 +136,23 @@ impl Mapper for Mapper4 {
     }
 
     fn write_ppu(&mut self, addr: u16, val: u8) {
-        match addr {
-            _ => {
-                panic!("Write to invalid mapper 4 ppu address {:X}", addr);
-            }
-        }
+        println!("Ignoring ppu write to {:X} value {}", addr, val)
     }
 
-    fn horizontal_mirroring(&self, rom_val: bool) -> bool {
+    fn horizontal_mirroring(&self, _: bool) -> bool {
         self.horizontal_mirroring
+    }
+
+    fn ppu_scanline(&mut self, cpu: &mut Cpu) {
+        if self.irq_reload || self.irq_counter == 0 {
+            self.irq_reload = false;
+            self.irq_counter = self.irq_counter_reload;
+        }
+
+        if self.irq_counter > 0 { self.irq_counter -= 1; }
+
+        if self.irq_counter == 0 && self.irq_enable {
+            cpu.irq();
+        }
     }
 }

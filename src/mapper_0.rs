@@ -1,4 +1,5 @@
 use memory::*;
+use cpu::Cpu;
 
 pub struct Mapper0 {
     prg: Vec<u8>,
@@ -75,4 +76,6 @@ impl Mapper for Mapper0 {
     fn horizontal_mirroring(&self, rom_val: bool) -> bool {
         rom_val
     }
+
+    fn ppu_scanline(&mut self, _: &mut Cpu) { }
 }

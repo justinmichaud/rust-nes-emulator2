@@ -138,6 +138,8 @@ pub struct Ppu {
 
     states: Vec<MidframeState>,
     has_drawn_sprite0_background: bool,
+
+    last_ticked_scanline: u32,
 }
 
 impl Ppu {
@@ -190,6 +192,7 @@ impl Ppu {
 
             states: vec![],
             has_drawn_sprite0_background: false,
+            last_ticked_scanline: 255,
         }
     }
 
@@ -322,6 +325,19 @@ impl Ppu {
 
     pub fn tick(&mut self, cpu: &mut Cpu, mapper: &mut Box<Mapper>) {
         let y = cpu.count*3/341;
+
+        if y < self.last_ticked_scanline {
+            while self.last_ticked_scanline <= 241 {
+                self.last_ticked_scanline += 1;
+                mapper.ppu_scanline(cpu);
+            }
+            self.last_ticked_scanline = 0;
+        }
+
+        while self.last_ticked_scanline < y && self.last_ticked_scanline < 241 {
+            self.last_ticked_scanline += 1;
+            mapper.ppu_scanline(cpu);
+        }
 
         if y < VBL && !self.has_blanked {
             self.has_blanked = true;

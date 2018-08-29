@@ -1,4 +1,5 @@
 use std::ops::RangeInclusive;
+use cpu::Cpu;
 
 pub trait Mapper {
     fn read(&mut self, addr: u16) -> u8;
@@ -10,6 +11,8 @@ pub trait Mapper {
     fn write_ppu(&mut self, addr: u16, val: u8);
 
     fn horizontal_mirroring(&self, rom_val: bool) -> bool;
+
+    fn ppu_scanline(&mut self, cpu: &mut Cpu);
 }
 
 pub trait Mem {
