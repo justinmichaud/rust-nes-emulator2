@@ -332,7 +332,7 @@ impl Ppu {
 
         while self.last_ticked_scanline < y && self.last_ticked_scanline < 262 {
             self.last_ticked_scanline += 1;
-            if y > 0 && y < 241 {
+            if y >= 21 && y < 262 {
                 if mapper.ppu_scanline(cpu) { self.push_state(cpu, mapper); }
             }
         }
