@@ -122,8 +122,8 @@ pub struct Ppu {
     greyscale: bool,
     mask_left_background: bool, // 1: Show background in leftmost 8 pixels of screen, 0: Hide
     mask_left_sprites: bool,
-    show_background: bool,
-    show_sprites: bool,
+    pub show_background: bool,
+    pub show_sprites: bool,
     em_red: bool,
     em_green: bool,
     em_blue: bool,
@@ -333,7 +333,7 @@ impl Ppu {
         while self.last_ticked_scanline < y && self.last_ticked_scanline < 262 {
             self.last_ticked_scanline += 1;
             if y >= 20 && y < 262 {
-                if mapper.ppu_scanline(cpu) { self.push_state(cpu, mapper); }
+                if mapper.ppu_scanline(cpu, self) { self.push_state(cpu, mapper); }
             }
         }
 

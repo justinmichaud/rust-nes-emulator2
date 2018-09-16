@@ -3,6 +3,7 @@ use cpu::Cpu;
 use std::fmt::Debug;
 use std::fmt::Error;
 use std::fmt::Formatter;
+use ppu::Ppu;
 
 #[derive(Clone)]
 pub struct Mapper0 {
@@ -87,5 +88,5 @@ impl Mapper for Mapper0 {
         rom_val
     }
 
-    fn ppu_scanline(&mut self, _: &mut Cpu) -> bool { false }
+    fn ppu_scanline(&mut self, _: &mut Cpu, _: &mut Ppu) -> bool { false }
 }

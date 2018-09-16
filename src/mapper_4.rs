@@ -3,6 +3,7 @@ use cpu::Cpu;
 use std::fmt::Error;
 use std::fmt::Formatter;
 use std::fmt::Debug;
+use ppu::Ppu;
 
 #[derive(Clone)]
 pub struct Mapper4 {
@@ -162,9 +163,9 @@ impl Mapper for Mapper4 {
         self.horizontal_mirroring
     }
 
-    fn ppu_scanline(&mut self, cpu: &mut Cpu) -> bool {
+    fn ppu_scanline(&mut self, cpu: &mut Cpu, ppu: &mut Ppu) -> bool {
         if self.irq_counter == 0 && self.irq_enable && !self.irq_reload {
-            cpu.irq();
+            if ppu.show_background || ppu.show_sprites { cpu.irq(); }
         }
 
         if self.irq_reload || self.irq_counter == 0 {

@@ -2,6 +2,7 @@ use std::ops::RangeInclusive;
 use cpu::Cpu;
 use objekt;
 use std::fmt::Debug;
+use ppu::Ppu;
 
 pub trait Mapper: objekt::Clone + Debug {
     fn read(&mut self, addr: u16) -> u8;
@@ -14,7 +15,7 @@ pub trait Mapper: objekt::Clone + Debug {
 
     fn horizontal_mirroring(&self, rom_val: bool) -> bool;
 
-    fn ppu_scanline(&mut self, cpu: &mut Cpu) -> bool;
+    fn ppu_scanline(&mut self, cpu: &mut Cpu, ppu: &mut Ppu) -> bool;
 }
 
 pub trait Mem {
