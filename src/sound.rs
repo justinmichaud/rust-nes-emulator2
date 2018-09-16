@@ -33,20 +33,24 @@ pub fn init_audio(sdl: Sdl) -> NesSound {
     };
 
     let apu_state = NesApuState {
-        envelope_timer_samples: 0,
-        wave_timer_samples: 0,
-        length_counter_samples: 0,
-        sweep_counter_samples: 0,
-        length_counter_orig: 0,
-        length_counter_halt: false,
-        volume: 0,
-        constant_volume: false,
-        timer: 0,
-        sweep_enabled: false,
-        sweep_period: 0,
-        sweep_shift: 0,
-        sweep_negate: false,
-        mute: false,
+        square: [
+            NesSquareChannel {
+                envelope_timer_samples: 0,
+                wave_timer_samples: 0,
+                length_counter_samples: 0,
+                sweep_counter_samples: 0,
+                length_counter_orig: 0,
+                length_counter_halt: false,
+                volume: 0,
+                constant_volume: false,
+                timer: 0,
+                sweep_enabled: false,
+                sweep_period: 0,
+                sweep_shift: 0,
+                sweep_negate: false,
+                mute: false,
+            }; 2
+        ],
     };
 
     let arc = Arc::new(Mutex::new(apu_state));
@@ -72,6 +76,11 @@ pub fn init_audio(sdl: Sdl) -> NesSound {
 
 #[derive(Debug)]
 struct NesApuState {
+    square: [NesSquareChannel; 2],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NesSquareChannel {
     envelope_timer_samples: u32,
     wave_timer_samples: u32,
     length_counter_samples: u32,
@@ -89,7 +98,12 @@ struct NesApuState {
     mute: bool,
 }
 
-impl NesApuState {
+trait Channel {
+    fn tick(&mut self) -> u32;
+    fn length_counter(&self) -> u8;
+}
+
+impl Channel for NesSquareChannel {
     fn tick(&mut self) -> u32 {
         let target_timer = if !self.sweep_enabled { self.timer } else {
             if self.sweep_negate {
@@ -108,9 +122,9 @@ impl NesApuState {
             self.envelope_timer_samples as f64 / envelope_samples_period
         };
 
-        let volume = if self.constant_volume { 8 * self.volume as u32 } else {
+        let volume = if self.constant_volume { self.volume as u32 } else {
             if envelope_pos > 1.0 { 0 } else {
-                ((1.0 - envelope_pos) * 15.0 * 8.0) as u32
+                ((1.0 - envelope_pos) * 15.0) as u32
             }
         };
 
@@ -136,6 +150,18 @@ impl NesApuState {
             let pos = self.length_counter_samples as f64 / note_duration_samples;
             if pos > 1.0 { 0 } else { self.length_counter_orig }
         }
+    }
+}
+
+impl NesApuState {
+    fn tick(&mut self) -> u32 {
+        let mut sample: f64 = 0.0;
+        for channel in self.square.iter_mut() { sample += channel.tick() as f64 };
+
+        // https://wiki.nesdev.com/w/index.php/APU_Mixer#Linear_Approximation
+        sample *= 0.00752;
+
+        (sample * 255.0) as u32
     }
 }
 
@@ -172,7 +198,9 @@ impl Mem for NesSound {
 
                 let old_counter_inhibit = if self.frame_counter_inhibit {1} else {0};
                 self.frame_counter_inhibit = false;
-                (old_counter_inhibit << 6) | (if state.length_counter() > 0 { 0b00000001 } else {0})
+                (old_counter_inhibit << 6)
+                    | (if state.square[0].length_counter() > 0 { 0b00000001 } else {0})
+                    | (if state.square[1].length_counter() > 0 { 0b00000010 } else {0})
             }
             _ => 0
         }
@@ -182,34 +210,38 @@ impl Mem for NesSound {
         let mut state = self.state_mut.lock().unwrap();
 
         match addr as usize {
-            0x4004 => {
-                state.length_counter_halt = (val&0b00100000) != 0;
-                state.constant_volume = (val&0b00010000) != 0;
-                state.volume = val&0b00001111;
-                state.mute = false;
+            0x4000 | 0x4004 => {
+                let mut channel = &mut state.square[if addr == 0x4000 { 0 } else { 1 }];
+                channel.length_counter_halt = (val&0b00100000) != 0;
+                channel.constant_volume = (val&0b00010000) != 0;
+                channel.volume = val&0b00001111;
+                channel.mute = false;
             }
-            0x4005 => {
-                state.sweep_enabled = (val&0b10000000) != 0;
-                state.sweep_period = (val&0b01110000)>>4;
-                state.sweep_negate = (val&0b00001000) != 0;
-                state.sweep_shift = val&0b00000111;
-                state.sweep_counter_samples = 0;
-                state.mute = false;
-                if state.sweep_enabled { println!("Sweep enabled"); }
+            0x4001 | 0x4005 => {
+                let mut channel = &mut state.square[if addr == 0x4001 { 0 } else { 1 }];
+                channel.sweep_enabled = (val&0b10000000) != 0;
+                channel.sweep_period = (val&0b01110000)>>4;
+                channel.sweep_negate = (val&0b00001000) != 0;
+                channel.sweep_shift = val&0b00000111;
+                channel.sweep_counter_samples = 0;
+                channel.mute = false;
+                if channel.sweep_enabled { println!("Sweep enabled"); }
             }
-            0x4006 => {
-                state.timer = (state.timer & 0b11111111_00000000) | ((val as u16) & 0b00000000_11111111);
-                state.wave_timer_samples = 0;
-                state.mute = false;
+            0x4002 | 0x4006 => {
+                let mut channel = &mut state.square[if addr == 0x4002 { 0 } else { 1 }];
+                channel.timer = (channel.timer & 0b11111111_00000000) | ((val as u16) & 0b00000000_11111111);
+                channel.wave_timer_samples = 0;
+                channel.mute = false;
             }
-            0x4007 => {
-                state.timer = (state.timer & 0b00000000_11111111) | ((val as u16 & 0b00000111) << 8);
-                state.length_counter_orig = *LENGTH_LOOKUP.get((val as usize & 0b11111000) >> 3).unwrap_or(&0);
-                state.length_counter_samples = 0;
-                state.envelope_timer_samples = 0;
-                state.wave_timer_samples = 0;
-                state.sweep_counter_samples = 0;
-                state.mute = false;
+            0x4003 | 0x4007 => {
+                let mut channel = &mut state.square[if addr == 0x4003 { 0 } else { 1 }];
+                channel.timer = (channel.timer & 0b00000000_11111111) | ((val as u16 & 0b00000111) << 8);
+                channel.length_counter_orig = *LENGTH_LOOKUP.get((val as usize & 0b11111000) >> 3).unwrap_or(&0);
+                channel.length_counter_samples = 0;
+                channel.envelope_timer_samples = 0;
+                channel.wave_timer_samples = 0;
+                channel.sweep_counter_samples = 0;
+                channel.mute = false;
             }
             0x4017 => {
                 self.frame_counter_mode = (val&0b10000000)>>7;
