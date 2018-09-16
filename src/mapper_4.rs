@@ -163,15 +163,15 @@ impl Mapper for Mapper4 {
     }
 
     fn ppu_scanline(&mut self, cpu: &mut Cpu) -> bool {
+        if self.irq_counter == 0 && self.irq_enable && !self.irq_reload {
+            cpu.irq();
+        }
+
         if self.irq_reload || self.irq_counter == 0 {
             self.irq_reload = false;
             self.irq_counter = self.irq_counter_reload;
-        }
-
-        if self.irq_counter > 0 { self.irq_counter -= 1; }
-
-        if self.irq_counter == 0 && self.irq_enable {
-            cpu.irq();
+        } else {
+            if self.irq_counter > 0 { self.irq_counter -= 1; }
         }
 
         if self.dirty {

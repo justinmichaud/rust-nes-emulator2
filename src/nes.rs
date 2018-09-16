@@ -88,11 +88,11 @@ impl Nes {
             self.chipset.ppu.tick(&mut self.cpu, &mut self.chipset.mapper);
             self.chipset.sound.tick(&mut self.cpu, &mut self.chipset.mapper);
 
-            if self.cpu.debug {
-                if get_line().starts_with("d") {
-                    self.cpu.debug = false;
-                }
-            }
+//            if self.cpu.debug {
+//                if get_line().starts_with("d") {
+//                    self.cpu.debug = false;
+//                }
+//            }
         }
 
         self.cpu.count -= frame_time;

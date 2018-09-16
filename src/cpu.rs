@@ -823,6 +823,8 @@ impl Cpu {
                 mem.read16(0xFFFE)
             };
 
+            if self.debug { println!("Interrupt going to handler: {:X}, nmi: {:X}, irq: {:X}", addr, mem.read16(0xFFFA), mem.read16(0xFFFE)); }
+
             self.count += 7;
             let pc = self.pc;
             push16(self, mem, pc);
@@ -843,6 +845,7 @@ impl Cpu {
     }
 
     pub fn irq(&mut self) {
+        if self.debug { println!("irq waiting"); }
         self.irq_waiting = true;
     }
 }

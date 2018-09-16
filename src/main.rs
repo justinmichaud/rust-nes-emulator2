@@ -48,7 +48,7 @@ impl ControllerMethod for User {
     fn do_input(&mut self, nes: &mut Nes, e: &Event) {
         if let Some(button) = e.press_args() {
             match button {
-                Button::Keyboard(Key::D) => nes.cpu.debug = DEBUG,
+                Button::Keyboard(Key::D) => nes.cpu.debug = true,
                 Button::Keyboard(Key::R) => {
                     if DEBUG {
                         write_bytes_to_file(format!("{}.bin", self.dump_count), &nes.chipset.mem.ram);
