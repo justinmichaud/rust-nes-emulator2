@@ -330,9 +330,9 @@ impl Ppu {
     pub fn tick(&mut self, cpu: &mut Cpu, mapper: &mut Box<Mapper>) {
         let y = cpu.count*3/341;
 
-        while self.last_ticked_scanline < y && self.last_ticked_scanline < 262 {
+        while self.last_ticked_scanline < y && self.last_ticked_scanline < 262 && (cpu.count*3)%341 > 260 {
             self.last_ticked_scanline += 1;
-            if y >= 20 && y < 262 {
+            if y >= 19 && y < 260 {
                 if mapper.ppu_scanline(cpu, self) { self.push_state(cpu, mapper); }
             }
         }
@@ -579,7 +579,7 @@ impl Ppu {
     }
 
     pub fn prepare_draw(&mut self, mapper: &mut Box<Mapper>) {
-        if self.last_ticked_scanline != 262 { panic!("Last ticked scanline is {}", self.last_ticked_scanline); }
+//        if self.last_ticked_scanline != 262 { panic!("Last ticked scanline is {}", self.last_ticked_scanline); }
         self.last_ticked_scanline = 0;
 
         for x in 0..self.output_canvas.width() {
