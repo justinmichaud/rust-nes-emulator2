@@ -1,8 +1,8 @@
 # Rust NES emulator v2
 
-This is the second iteration of [v1](https://github.com/justinmichaud/rust-nes-emulator). This version adds partial audio and mapper 4 support, fixes some build issues, and removes the Super Mario Bros hacks / level editing capabilities of the first version.
-
 A simple NES emulator, with partial support for Mapper 4 (Super Mario Bros. 2 and 3 use this) and audio. It is still very buggy, and was built entirely for the learning experience.
+
+This is the second iteration of [v1](https://github.com/justinmichaud/rust-nes-emulator). This version adds a few features, fixes some build issues, and removes the Super Mario Bros hacks / level editing capabilities of the first version.
 
 ![Super Mario Bros](/smb.gif?raw=true "Super Mario Bros")
 
