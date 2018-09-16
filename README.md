@@ -1,14 +1,23 @@
 # Rust NES emulator v2
 
-Games that don't use any fancy ppu trickery work, including Donkey Kong and Super Mario Bros. Only mapper 0 is supported. Sound is not supported.
+This is the second iteration of [v1](https://github.com/justinmichaud/rust-nes-emulator). This version adds partial audio and mapper 4 support, fixes some build issues, and removes the Super Mario Bros hacks / level editing capabilities of the first version.
+
+A simple NES emulator, with partial support for Mapper 4 (Super Mario Bros. 2 and 3 use this) and audio. It is still very buggy, and was built entirely for the learning experience.
 
 ![Super Mario Bros](/smb.gif?raw=true "Super Mario Bros")
+
+![Super Mario Bros 2](/smb2.1.png?raw=true "Super Mario Bros 2")
+![Super Mario Bros 2](/smb2.2.png?raw=true "Super Mario Bros 2")
+![Super Mario Bros 2](/smb2.3.png?raw=true "Super Mario Bros 2")
+
+![Super Mario Bros 3](/smb3.1.png?raw=true "Super Mario Bros 3")
+![Super Mario Bros 3](/smb3.2.png?raw=true "Super Mario Bros 3")
+![Super Mario Bros 3](/smb3.3.png?raw=true "Super Mario Bros 3")
+
+As you can see, there are still a few bugs left to work out in SMB3 relating to graphical glitches. Also, performance could be improved and the code could be cleaned up significantly. The scanline emulation in particular is slow and inaccurate.
 
 # Building for web
 This used to work, but I need to fix it
 
 # Building for desktop
 Install SDL2-devel, then `cargo run --release`. Put rom file in assets/smb.nes (sha1sum: ea343f4e445a9050d4b4fbac2c77d0693b1d0922)
-
-# Bugs:
-- Piston HiDPI support seems to be broken? Also, on Fedora the window piston makes is very buggy
